@@ -7,7 +7,7 @@ import board
 import busio
 import config
 import digitalio
-import digitalio
+import pwmio
 
 # User config
 WPM = config.WPM
@@ -26,6 +26,12 @@ txLED = digitalio.DigitalInOut(board.GP11)
 txLED.direction = digitalio.Direction.OUTPUT
 txLED.value = False
 
+# setup vco (set duty cycle to ON to sound)
+vco = pwmio.PWMOut(board.GP15, variable_frequency=True)
+vco.frequency = 880
+ON = 2**15
+OFF = 0
+
 
 def setFrequency(frequency, si5351):
     xtalFreq = XTAL_FREQ
@@ -40,8 +46,8 @@ def setFrequency(frequency, si5351):
     f /= xtalFreq
     num = int(f)
     denom = 1048575
-    si5351.pll_a.configure_fractional(mult, num, denom)
-    si5351.clock_0.configure_integer(si5351.pll_a, divider)
+    si5351.pll_b.configure_fractional(mult, num, denom)
+    si5351.clock_0.configure_integer(si5351.pll_b, divider)
 
 
 # setup encode and decode
@@ -208,6 +214,40 @@ def FSKCW(si5351, cwBeacon):
     time.sleep(15)
 
 
+def FMCW(si5351, cwBeacon):
+    setFrequency(((FREQ + OFFSET) * 1000), si5351)
+    print("Measured Frequency: {0:0.3f} MHz".format(si5351.clock_0.frequency / 1000000))
+    print("Key down for 15secs")
+    si5351.outputs_enabled = True
+    while len(cwBeacon) != 0:
+        letter = cwBeacon[:1]
+        cwBeacon = cwBeacon[1:]
+        print(letter, end="")
+
+        for sound in encode(letter):
+            if sound == ".":
+                vco.duty_cycle = ON
+                txLED.value = True
+                time.sleep(dit_time())
+                txLED.value = False
+                vco.duty_cycle = OFF
+                time.sleep(dit_time())
+            elif sound == "-":
+                vco.duty_cycle = ON
+                txLED.value = True
+                time.sleep(dit_time())
+                time.sleep(3 * dit_time())
+                vco.duty_cycle = OFF
+                txLED.value = False
+                time.sleep(dit_time())
+            elif sound == " ":
+                time.sleep(4 * dit_time())
+        time.sleep(2 * dit_time())
+    print("Pause for 15secs")
+    si5351.outputs_enabled = False
+    time.sleep(15)
+
+
 time.sleep(0.5)
 delay = " " * BEACONDELAY
 cwBeacon = BEACON + delay
@@ -215,6 +255,6 @@ si5351 = adafruit_si5351.SI5351(i2c)
 
 while True:
     print("CW Mode")
-    CW(si5351, cwBeacon)
+    FMCW(si5351, cwBeacon)
     # print("FSKCW Mode")
     # FSKCW(si5351,cwBeacon)
