@@ -10,9 +10,11 @@ Si5351 si5351;
 void setup()
 {
   delay(2000);
+  Serial.println("Enable I2C bus");
   Wire.begin(1);    // I2C bus address = 1
+  delay(3000);
   si5351.reset();
-  delay(500);
+  Serial.println("Reset SI5351");
   si5351.init(SI5351_CRYSTAL_LOAD_8PF,0,0);
   si5351.set_vcxo(PLLB_FREQ, 61); //0->232 (deviation)
   si5351.set_ms_source(SI5351_CLK0, SI5351_PLLB);
@@ -65,7 +67,7 @@ void loop()
   }
   si5351.output_enable(SI5351_CLK0, 0);
 
-  delay(60000);
+  delay(20000);
   
   
 }
